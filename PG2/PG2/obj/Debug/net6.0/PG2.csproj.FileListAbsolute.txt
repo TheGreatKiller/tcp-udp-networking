@@ -1,0 +1,14 @@
+C:\Repo\PG2\PG2\bin\Debug\net6.0\PG2.exe
+C:\Repo\PG2\PG2\bin\Debug\net6.0\PG2.deps.json
+C:\Repo\PG2\PG2\bin\Debug\net6.0\PG2.runtimeconfig.json
+C:\Repo\PG2\PG2\bin\Debug\net6.0\PG2.dll
+C:\Repo\PG2\PG2\bin\Debug\net6.0\PG2.pdb
+C:\Repo\PG2\PG2\obj\Debug\net6.0\PG2.GeneratedMSBuildEditorConfig.editorconfig
+C:\Repo\PG2\PG2\obj\Debug\net6.0\PG2.AssemblyInfoInputs.cache
+C:\Repo\PG2\PG2\obj\Debug\net6.0\PG2.AssemblyInfo.cs
+C:\Repo\PG2\PG2\obj\Debug\net6.0\PG2.csproj.CoreCompileInputs.cache
+C:\Repo\PG2\PG2\obj\Debug\net6.0\PG2.dll
+C:\Repo\PG2\PG2\obj\Debug\net6.0\refint\PG2.dll
+C:\Repo\PG2\PG2\obj\Debug\net6.0\PG2.pdb
+C:\Repo\PG2\PG2\obj\Debug\net6.0\PG2.genruntimeconfig.cache
+C:\Repo\PG2\PG2\obj\Debug\net6.0\ref\PG2.dll

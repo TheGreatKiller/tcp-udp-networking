@@ -4,6 +4,11 @@ using UnityEngine;
 using System.Net;
 using System.Net.Sockets;
 using System;
+using System.Net.Security;
+using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
+using UnityEditor.PackageManager;
+using System.IO;
 
 public class Client : MonoBehaviour
 {
@@ -46,11 +51,12 @@ public class Client : MonoBehaviour
     public class TCP
     {
         public TcpClient socket;
-
+        private SslStream sslStream;
         private NetworkStream stream;
         private Packet receivedData;
         private byte[] receiveBuffer;
-
+        
+        private string serverName = "127.0.0.1";
         public void Connect()
         {
             socket = new TcpClient
@@ -71,12 +77,50 @@ public class Client : MonoBehaviour
             {
                 return;
             }
-
-            stream = socket.GetStream();
-
+            
+            SslStream _sslStream = new SslStream(
+               socket.GetStream(),
+               false,
+               new RemoteCertificateValidationCallback(ValidateServerCertificate),
+               null
+               );
+            // The server name must match the name on the server certificate.
+            try
+            {
+                _sslStream.AuthenticateAsClient(serverName);
+            }
+            catch (AuthenticationException e)
+            {
+                Debug.Log(e.Message);
+                if (e.InnerException != null)
+                {
+                    Debug.Log( e.InnerException.Message);
+                }
+                //Console.WriteLine("Authentication failed - closing the connection.");
+                socket.Close();
+                return;
+            }
+            sslStream = _sslStream;
             receivedData = new Packet();
 
-            stream.BeginRead(receiveBuffer, 0, dataBufferSize, ReceiveCallback, null);
+            sslStream.BeginRead(receiveBuffer, 0, dataBufferSize, ReceiveCallback, null);
+        }
+
+        private bool ValidateServerCertificate(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors)
+        {
+            if (sslPolicyErrors == SslPolicyErrors.None)
+            {
+                // Optionally, check if the certificate meets your specific criteria
+                // For example, validate the certificate's expiration date, subject, etc.
+
+                // If all checks pass, return true to accept the certificate
+                return true;
+            }
+            Debug.Log(certificate.Subject);
+            Debug.Log(serverName);
+            // If there are SSL policy errors, reject the certificate
+            Debug.Log($"SSL Policy Errors: {sslPolicyErrors}");
+            return false;
         }
 
         public void SendData(Packet _packet)
@@ -85,7 +129,7 @@ public class Client : MonoBehaviour
             {
                 if (socket != null)
                 {
-                    stream.BeginWrite(_packet.ToArray(), 0, _packet.Length(), null, null);
+                    sslStream.BeginWrite(_packet.ToArray(), 0, _packet.Length(), null, null);
                 }
             }
             catch (Exception _ex)
@@ -98,7 +142,7 @@ public class Client : MonoBehaviour
         {
             try
             {
-                int _byteLength = stream.EndRead(_result);
+                int _byteLength = sslStream.EndRead(_result);
                 if (_byteLength <= 0)
                 {
                     // TODO: disconnect
@@ -107,9 +151,14 @@ public class Client : MonoBehaviour
 
                 byte[] _data = new byte[_byteLength];
                 Array.Copy(receiveBuffer, _data, _byteLength);
-
+                string logData = string.Empty;
+                for (int i = 0; i < _data.Length; i++)
+                {
+                    logData += _data[i];
+                }
+                Debug.Log(logData);
                 receivedData.Reset(HandleData(_data));
-                stream.BeginRead(receiveBuffer, 0, dataBufferSize, ReceiveCallback, null);
+                sslStream.BeginRead(receiveBuffer, 0, dataBufferSize, ReceiveCallback, null);
             }
             catch
             {
