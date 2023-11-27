@@ -8,9 +8,11 @@ using System.Net.Security;
 using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using System.IO;
+using System.Threading;
 
 public class Client : MonoBehaviour
 {
+    private static CancellationTokenSource cancellationTokenSource;
     public static Client instance;
     public static int dataBufferSize = 4096;
 
@@ -33,6 +35,14 @@ public class Client : MonoBehaviour
             Debug.Log("Instance already exists, destroying object!");
             Destroy(this);
         }
+    }
+    private void OnDestroy()
+    {
+        cancellationTokenSource?.Cancel();
+    }
+    private void OnApplicationQuit()
+    {
+        Disconnect();
     }
 
     private void Start()
@@ -68,7 +78,7 @@ public class Client : MonoBehaviour
             socket.BeginConnect(instance.ip, instance.port, ConnectCallback, socket);
         }
 
-        private void ConnectCallback(IAsyncResult _result)
+        private async void ConnectCallback(IAsyncResult _result)
         {
             socket.EndConnect(_result);
 
@@ -76,28 +86,41 @@ public class Client : MonoBehaviour
             {
                 return;
             }
-            
+            cancellationTokenSource = new CancellationTokenSource();
             SslStream _sslStream = new SslStream(
                socket.GetStream(),
                false,
                new RemoteCertificateValidationCallback(ValidateServerCertificate),
                null
                );
-            // The server name must match the name on the server certificate.
             try
             {
-                _sslStream.AuthenticateAsClient(serverName);
+                SslClientAuthenticationOptions sslClientAuthenticationOptions = new SslClientAuthenticationOptions();
+                sslClientAuthenticationOptions.TargetHost=serverName;
+                
+                await _sslStream.AuthenticateAsClientAsync(sslClientAuthenticationOptions, cancellationTokenSource.Token);
+                
             }
             catch (AuthenticationException e)
             {
                 Debug.Log(e.Message);
                 if (e.InnerException != null)
                 {
-                    Debug.Log( e.InnerException.Message);
+                    Debug.Log(e.InnerException.Message);
                 }
                 //Console.WriteLine("Authentication failed - closing the connection.");
                 socket.Close();
                 return;
+            }
+            catch
+            {
+                Debug.Log("Task was cancelled!");
+                return;
+            }
+            finally
+            {
+                cancellationTokenSource.Dispose();
+                cancellationTokenSource = null;
             }
             sslStream = _sslStream;
             receivedData = new Packet();
@@ -144,24 +167,19 @@ public class Client : MonoBehaviour
                 int _byteLength = sslStream.EndRead(_result);
                 if (_byteLength <= 0)
                 {
-                    // TODO: disconnect
+                    Disconnect();
                     return;
                 }
 
                 byte[] _data = new byte[_byteLength];
                 Array.Copy(receiveBuffer, _data, _byteLength);
-                string logData = string.Empty;
-                for (int i = 0; i < _data.Length; i++)
-                {
-                    logData += _data[i];
-                }
-                Debug.Log(logData);
+
                 receivedData.Reset(HandleData(_data));
                 sslStream.BeginRead(receiveBuffer, 0, dataBufferSize, ReceiveCallback, null);
             }
             catch
             {
-                // TODO: disconnect
+                Disconnect();
             }
         }
 
@@ -210,8 +228,31 @@ public class Client : MonoBehaviour
 
             return false;
         }
+        private void Disconnect()
+        {
+            sslStream?.Dispose();
+            socket?.Close();
+            sslStream = null;
+            receivedData = null;
+            receiveBuffer = null;
+            socket = null;
+            instance.Disconnect();
+        }
     }
+    private void Disconnect()
+    {
+        try
+        {
+            tcp.socket?.Close();
+            Debug.Log("Disconnected From Server");
+        }
+        catch (Exception e)
+        {
 
+            Debug.Log($"Exception thrown {e}");
+        }
+        
+    }
     private void InitializeClientData()
     {
         packetHandlers = new Dictionary<int, PacketHandler>()
